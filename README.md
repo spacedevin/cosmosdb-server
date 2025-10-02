@@ -1,6 +1,8 @@
 # cosmosdb-server
 
-A Cosmos DB server implementation for testing your apps locally. The minimum supported NodeJS version is 20.
+
+
+A Cosmos DB server implementation for testing your apps locally with persistent storage. The minimum supported NodeJS version is 20.
 
 ```js
 const { default: cosmosServer } = require("@vercel/cosmosdb-server");
