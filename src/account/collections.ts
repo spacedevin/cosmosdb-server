@@ -31,7 +31,7 @@ export default class Collections extends Items<Database, Collection> {
   }
 
   _newItem(data: ItemObject | undefined | null) {
-    return new Collection(data);
+    return new Collection(data, this._storageFactory);
   }
 
   _rid(id: number) {

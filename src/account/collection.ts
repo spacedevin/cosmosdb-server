@@ -5,6 +5,7 @@ import Documents from "./documents";
 import PartitionKeyRanges from "./partition-key-ranges";
 import UserDefinedFunctions from "./user-defined-functions";
 import { PartitionValue } from "../types";
+import { StorageFactory } from "../storage/interfaces";
 
 export default class Collection extends Item {
   documents: Documents;
@@ -13,7 +14,7 @@ export default class Collection extends Item {
 
   userDefinedFunctions: UserDefinedFunctions;
 
-  constructor(data: ItemObject | undefined | null) {
+  constructor(data: ItemObject | undefined | null, storageFactory?: StorageFactory) {
     super(data);
     this.documents = new Documents(
       this,
@@ -24,7 +25,8 @@ export default class Collection extends Item {
           return accum;
         },
         []
-      )
+      ),
+      storageFactory
     );
     this.partitionKeyRanges = new PartitionKeyRanges(this, ["/id"]);
     this.userDefinedFunctions = new UserDefinedFunctions(this);

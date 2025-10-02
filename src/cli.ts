@@ -8,6 +8,8 @@ const args: {
   port?: number;
   hostname?: string;
   nossl?: boolean;
+  storageMode?: string;
+  debug?: boolean;
 } = {};
 while (argv.length) {
   const key = argv.shift();
@@ -26,6 +28,12 @@ while (argv.length) {
     case "--no-ssl":
       args.nossl = true;
       break;
+    case "--storage-mode":
+      args.storageMode = argv.shift();
+      break;
+    case "--debug":
+      args.debug = true;
+      break;
     default:
       break;
   }
@@ -38,16 +46,18 @@ Usage: cosmosdb-server [options]
 
 Options:
 
-  -h, --help
-  -p, --port
-  --no-ssl
-  --host
+  -h, --help         Show this help message
+  -p, --port         Port to listen on (default: 8081)
+  --no-ssl           Disable SSL/TLS
+  --host             Hostname to bind to
+  --storage-mode     Storage mode: memory|file (default: memory)
+  --debug            Enable debug logging
 `);
   process.exit();
 }
 
 const cosmosDBServer = args.nossl ? createHttpServer : createHttpsServer;
-const server = cosmosDBServer().listen(args.port, args.hostname, () => {
+const server = cosmosDBServer({ storageMode: args.storageMode, debug: args.debug }).listen(args.port, args.hostname, () => {
   const { address, family, port } = server.address() as net.AddressInfo;
   // eslint-disable-next-line no-nested-ternary
   const hostname = args.hostname

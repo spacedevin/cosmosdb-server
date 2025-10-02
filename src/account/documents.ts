@@ -26,6 +26,9 @@ export default class Documents extends Items<Collection, Document> {
     const idString = ResourceId.bigNumberReadIntBE(idBuffer, 0, 8).toString();
 
     const collection = this._parent.read();
+    if (!collection || !collection._rid) {
+      throw new Error('Collection not found or has no _rid');
+    }
     const rid = ResourceId.parse(collection._rid);
     rid.document = idString;
     return rid.toString();

@@ -7,6 +7,8 @@ import * as tls from "tls";
 import { randomUUID } from "crypto";
 import Account from "./account";
 import routes from "./routes";
+import { createStorageFactory, loadStorageConfig } from "./storage/storage-factory";
+import { setDebugEnabled } from "./debug";
 
 const generateRequestHandler = ({
   keepAlive = false
@@ -76,18 +78,36 @@ const generateRequestHandler = ({
   });
 };
 
-const createAccount = (address: string | net.AddressInfo) => {
+const createAccount = async (address: string | net.AddressInfo | null, storageMode?: string, debug?: boolean): Promise<Account> => {
   if (!address || typeof address !== "object") {
     throw new Error(`Unexpected address type: ${address}`);
+  }
+
+  // Set global debug state
+  if (debug) {
+    setDebugEnabled(true);
   }
 
   const { address: host, port } = address as net.AddressInfo;
   const hostname = host === "0.0.0.0" || host === "::" ? "localhost" : host;
 
-  return new Account(hostname, port);
+  // Create storage factory if storage mode is specified
+  let account: Account;
+  if (storageMode && storageMode !== 'memory') {
+    const storageConfig = loadStorageConfig(storageMode);
+    const storageFactory = createStorageFactory(storageConfig);
+    account = new Account(hostname, port, storageFactory);
+  } else {
+    account = new Account(hostname, port);
+  }
+
+  // Initialize account to restore data from persistent storage
+  await account.initialize();
+  
+  return account;
 };
 
-export function createHttpServer(opts: http.ServerOptions = {}) {
+export function createHttpServer(opts: http.ServerOptions & { storageMode?: string; debug?: boolean } = {}) {
   let account: Account | undefined;
 
   const handleRequest = generateRequestHandler({
@@ -95,36 +115,62 @@ export function createHttpServer(opts: http.ServerOptions = {}) {
   });
   const server = http
     .createServer(opts, (req, res) => {
+      if (!account) {
+        res.statusCode = 503;
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ message: 'Server still initializing' }));
+        return;
+      }
       handleRequest(account, req, res);
     })
-    .on("listening", () => {
-      account = createAccount(server.address());
+    .on("listening", async () => {
+      try {
+        account = await createAccount(server.address(), opts.storageMode, opts.debug);
+        console.log('Server ready and account initialized');
+      } catch (error) {
+        console.error('Failed to initialize account:', error);
+        server.close();
+      }
     });
 
   return server;
 }
 
-export function createHttpsServer(opts?: https.ServerOptions) {
+const getCertificate = (name: string) => {
+  return readFileSync(join(__dirname, "..", name));
+};
+
+export function createHttpsServer(opts: https.ServerOptions & { storageMode?: string; debug?: boolean } = {}) {
   let account: Account | undefined;
 
-  const options: https.ServerOptions = {
-    cert: readFileSync(join(__dirname, "..", "cert.pem")),
-    key: readFileSync(join(__dirname, "..", "key.pem")),
-    minVersion: "TLSv1" as tls.SecureVersion,
-    rejectUnauthorized: false,
-    requestCert: false,
-    ...opts
+  const handleRequest = generateRequestHandler({
+    keepAlive: opts.keepAlive
+  });
+
+  const options = {
+    key: getCertificate("key.pem"),
+    cert: getCertificate("cert.pem"),
+    ...opts,
   };
 
-  const handleRequest = generateRequestHandler({
-    keepAlive: options.keepAlive
-  });
   const server = https
     .createServer(options, (req, res) => {
+      if (!account) {
+        res.statusCode = 503;
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ message: 'Server still initializing' }));
+        return;
+      }
       handleRequest(account, req, res);
     })
-    .on("listening", () => {
-      account = createAccount(server.address());
+    .on("listening", async () => {
+      try {
+        account = await createAccount(server.address(), opts.storageMode, opts.debug);
+        console.log('Server ready and account initialized');
+      } catch (error) {
+        console.error('Failed to initialize account:', error);
+        server.close();
+      }
     });
 
   return server;

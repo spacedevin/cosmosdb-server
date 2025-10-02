@@ -8,7 +8,7 @@ import ResourceId from "./resource-id";
 
 export default class Databases extends Items<Account, Database> {
   _newItem(data: ItemObject | undefined | null) {
-    return new Database(data);
+    return new Database(data, this._storageFactory);
   }
 
   _rid(id: number) {
